@@ -97,9 +97,9 @@ class StreamDockN4(StreamDock):
                 direction=direction,
             )
 
-        # Knob presses are one-shot events (eventValue 0x00), not press/release
-        # pairs. Normalize the event to state=1 for downstream callbacks.
-        if state == 0x00 and hardware_code in self._KNOB_PRESS_MAP:
+        # The N4 C++ decoder reports knob presses for eventValue 0x01.
+        # Normalize this one-shot event to state=1 for downstream callbacks.
+        if state == 0x01 and hardware_code in self._KNOB_PRESS_MAP:
             return InputEvent(
                 event_type=EventType.KNOB_PRESS,
                 knob_id=self._KNOB_PRESS_MAP[hardware_code],
