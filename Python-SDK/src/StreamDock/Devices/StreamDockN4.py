@@ -1,6 +1,6 @@
 from StreamDock.FeatrueOption import device_type
 from .StreamDock import StreamDock
-from ..InputTypes import InputEvent, ButtonKey, EventType
+from ..InputTypes import InputEvent, ButtonKey, EventType, KnobId, Direction
 from PIL import Image
 import ctypes
 import ctypes.util
@@ -36,6 +36,24 @@ class StreamDockN4(StreamDock):
     # Reverse mapping: hardware key -> logical key (for event decoding)
     _HW_TO_LOGICAL_KEY = {v: k for k, v in _IMAGE_KEY_MAP.items()}
 
+    # Hardware event codes from the official C++ StreamDockN4 decoder.
+    _KNOB_ROTATE_MAP = {
+        0xA0: (KnobId.KNOB_1, Direction.LEFT),
+        0xA1: (KnobId.KNOB_1, Direction.RIGHT),
+        0x50: (KnobId.KNOB_2, Direction.LEFT),
+        0x51: (KnobId.KNOB_2, Direction.RIGHT),
+        0x90: (KnobId.KNOB_3, Direction.LEFT),
+        0x91: (KnobId.KNOB_3, Direction.RIGHT),
+        0x70: (KnobId.KNOB_4, Direction.LEFT),
+        0x71: (KnobId.KNOB_4, Direction.RIGHT),
+    }
+    _KNOB_PRESS_MAP = {
+        0x37: KnobId.KNOB_1,
+        0x35: KnobId.KNOB_2,
+        0x33: KnobId.KNOB_3,
+        0x36: KnobId.KNOB_4,
+    }
+
     def __init__(self, transport1, devInfo):
         super().__init__(transport1, devInfo)
 
@@ -57,7 +75,7 @@ class StreamDockN4(StreamDock):
         """
         Decode hardware event codes into a unified InputEvent
 
-        The N4 device supports only regular buttons; hardware code range 1-15
+        Button, knob rotation, and knob press events for StreamDock N4.
         """
         # Handle state value: 0x02=release, 0x01=press
         normalized_state = 1 if state == 0x01 else 0
@@ -68,6 +86,24 @@ class StreamDockN4(StreamDock):
                 event_type=EventType.BUTTON,
                 key=self._HW_TO_LOGICAL_KEY[hardware_code],
                 state=normalized_state
+            )
+
+        # The C++ N4 decoder reports knob rotation only for eventValue 0x00.
+        if state == 0x00 and hardware_code in self._KNOB_ROTATE_MAP:
+            knob_id, direction = self._KNOB_ROTATE_MAP[hardware_code]
+            return InputEvent(
+                event_type=EventType.KNOB_ROTATE,
+                knob_id=knob_id,
+                direction=direction,
+            )
+
+        # Knob presses are one-shot events (eventValue 0x00), not press/release
+        # pairs. Normalize the event to state=1 for downstream callbacks.
+        if state == 0x00 and hardware_code in self._KNOB_PRESS_MAP:
+            return InputEvent(
+                event_type=EventType.KNOB_PRESS,
+                knob_id=self._KNOB_PRESS_MAP[hardware_code],
+                state=1,
             )
 
         # Unknown event
