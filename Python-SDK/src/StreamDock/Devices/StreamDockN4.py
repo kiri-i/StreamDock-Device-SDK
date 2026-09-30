@@ -97,7 +97,7 @@ class StreamDockN4(StreamDock):
                 direction=direction,
             )
 
-        # The N4 C++ decoder reports knob presses for eventValue 0x01.
+        # Physical N4 reports use eventValue 0x01 for knob presses.
         # Normalize this one-shot event to state=1 for downstream callbacks.
         if state == 0x01 and hardware_code in self._KNOB_PRESS_MAP:
             return InputEvent(
